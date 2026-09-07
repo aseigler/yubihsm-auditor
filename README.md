@@ -14,13 +14,18 @@ usage.
 
 ## What it needs on the device
 
-An authentication key configured as an auditor. Only two capabilities are
+An authentication key configured as an auditor. Only one capability is
 required:
 
 | Capability        | Used for                                                |
 | ----------------- | ------------------------------------------------------- |
 | `get-log-entries` | reading the audit log                                   |
-| `set-log-index`   | acknowledging entries so the device can reuse the buffer |
+
+`SetLogIndex` (what acknowledges entries so the device can reuse the buffer)
+is not gated by a capability at all — the device accepts it from any
+authenticated key regardless of what's on its capability list. There is
+nothing to grant for it; `advance_log_index = true` will work with a key
+that only has `get-log-entries`.
 
 Optional, and only if you want the extras:
 
@@ -32,7 +37,7 @@ Optional, and only if you want the extras:
 Creating an auditor key with `yubihsm-shell`, in domain 1, key ID 4:
 
 ```
-yubihsm> put authkey 0 4 auditor 1 get-log-entries,set-log-index none <password>
+yubihsm> put authkey 0 4 auditor 1 get-log-entries none <password>
 ```
 
 Two device options matter:
