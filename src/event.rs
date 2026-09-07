@@ -392,11 +392,19 @@ pub fn entry_body(entry: &LogEntry) -> [u8; ENTRY_BODY_LEN] {
 }
 
 /// Expected digest of `entry` given the previous entry's digest:
-/// `SHA-256(previous_digest || entry_body)` truncated to 16 bytes.
+/// `SHA-256(entry_body || previous_digest)` truncated to 16 bytes.
+///
+/// Body-then-digest, not digest-then-body: confirmed against 5 consecutive
+/// real entries from a YubiHSM 2 (see `real_hardware_chain_from_yh2` below).
+/// The reversed order was silent before that - it compiled, ran, and simply
+/// reported every entry as `mismatch`, which looked identical to "formula is
+/// entirely wrong" until enough consecutive real digests ruled out every
+/// other candidate (hash function, endianness, truncation end) by brute
+/// force and left only the concatenation order.
 pub fn expected_digest(previous_digest: &[u8; DIGEST_LEN], entry: &LogEntry) -> [u8; DIGEST_LEN] {
     let mut hasher = Sha256::new();
-    hasher.update(previous_digest);
     hasher.update(entry_body(entry));
+    hasher.update(previous_digest);
     let full = hasher.finalize();
     let mut out = [0u8; DIGEST_LEN];
     out.copy_from_slice(&full[..DIGEST_LEN]);
@@ -501,6 +509,79 @@ mod tests {
             .chain(std::iter::repeat_n(0xffu8, 14))
             .collect();
         assert_eq!(entry_body(&sample).to_vec(), expected);
+    }
+
+    /// Real consecutive entries (item 9526-9531) captured via `--log-level
+    /// trace` from a production YubiHSM 2, used to pin down and verify the
+    /// concatenation order in `expected_digest`. Entry 9526 has no anchor
+    /// captured (it's the start of this window), so only the 5 links from
+    /// 9527 through 9531 are checked here - each against the *real* digest
+    /// of the entry before it, not a synthetic one.
+    #[test]
+    fn real_hardware_chain_from_yh2() {
+        fn hex16(s: &str) -> [u8; DIGEST_LEN] {
+            parse_hex16(s).unwrap()
+        }
+        let entries = [
+            (
+                entry_from(9526, command::Code::from_u8(103).unwrap(), 2, 4, NO_KEY, NO_KEY, 231, 93_053_330),
+                hex16("b00e2dafaf29356ad9f1935c09786a84"),
+            ),
+            (
+                entry_from(9527, command::Code::from_u8(3).unwrap(), 10, NO_KEY, 4, NO_KEY, 131, 93_207_583),
+                hex16("d0d58b51fa7de009184934ae46f64f6a"),
+            ),
+            (
+                entry_from(9528, command::Code::from_u8(4).unwrap(), 17, NO_KEY, 4, NO_KEY, 132, 93_207_583),
+                hex16("c6e5baa1fe4237062fc3880ec0c3a1e7"),
+            ),
+            (
+                entry_from(9529, command::Code::from_u8(103).unwrap(), 2, 4, NO_KEY, NO_KEY, 231, 93_207_584),
+                hex16("8b287a62b0aae1f3e437c6fa130a9bec"),
+            ),
+            (
+                entry_from(9530, command::Code::from_u8(3).unwrap(), 10, NO_KEY, 4, NO_KEY, 131, 93_210_093),
+                hex16("a1ccc06e0f9be382aa0200d7c26da166"),
+            ),
+            (
+                entry_from(9531, command::Code::from_u8(4).unwrap(), 17, NO_KEY, 4, NO_KEY, 132, 93_210_094),
+                hex16("4d812e0b53e096a7d87c68e11fc2500e"),
+            ),
+        ];
+        for i in 1..entries.len() {
+            let previous_digest = entries[i - 1].1;
+            let (entry, real_digest) = &entries[i];
+            assert_eq!(
+                expected_digest(&previous_digest, entry),
+                *real_digest,
+                "chain link into item {} did not verify",
+                entry.item
+            );
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn entry_from(
+        item: u16,
+        cmd: command::Code,
+        length: u16,
+        session_key: u16,
+        target_key: u16,
+        second_key: u16,
+        result: u8,
+        tick: u32,
+    ) -> LogEntry {
+        LogEntry {
+            item,
+            cmd,
+            length,
+            session_key,
+            target_key,
+            second_key,
+            result: response::Code::from_u8(result).unwrap(),
+            tick,
+            digest: [0u8; DIGEST_LEN],
+        }
     }
 
     #[test]

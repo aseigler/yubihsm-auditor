@@ -424,8 +424,16 @@ skip_poll_when_unchanged = true
 force_full_poll_every = 10
 
 # --- Output -----------------------------------------------------------------
-# [output]
-# type = "stdout"
+# Exactly one [output] block should be active (uncommented) below. The
+# default here is `stdout`, so `check`/`sample-events` work with zero setup;
+# swap in one of the others by deleting the placeholder above it and
+# uncommenting every line of the block you want - a block with some lines
+# commented and some not silently merges the uncommented ones into whichever
+# [output] table came before it, which is confusing to debug. TOML has no
+# concept of a "commented-out table": only a line-by-line `#`.
+
+[output]
+type = "stdout"
 
 # [output]
 # type = "file"
@@ -435,16 +443,16 @@ force_full_poll_every = 10
 
 # Generic: any syslog receiver, including Wazuh's manager <remote> listener,
 # rsyslog, syslog-ng, or a SIEM's syslog input.
-[output]
-type = "syslog"
-protocol = "tcp"
-host = "wazuh.example.com"
-port = 514
+# [output]
+# type = "syslog"
+# protocol = "tcp"
+# host = "wazuh.example.com"
+# port = 514
 # tls = true
 # ca_cert_file = "/etc/ssl/certs/internal-ca.pem"
 # use_platform_roots = true
-facility = 16
-app_name = "yubihsm-auditor"
+# facility = 16
+# app_name = "yubihsm-auditor"
 # format = "cef"                      # "json" (default) or "cef" for ArcSight/Sentinel/QRadar
 
 # [output]

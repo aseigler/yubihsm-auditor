@@ -306,36 +306,110 @@ device never depends on the estimate — use `sequence` for that.
 ### Hash chain
 
 Each entry carries a 16-byte digest chaining it to the previous entry. This tool
-checks `digest == SHA-256(previous_digest || entry_body)[0..16]` across
-consecutive entries and across polls (the last digest is persisted).
-`chain_status` is:
+checks `digest == SHA-256(entry_body || previous_digest)[0..16]` across
+consecutive entries and across polls (the last digest is persisted). Verified
+against 5 consecutive real entries captured from a production YubiHSM 2 (see
+`real_hardware_chain_from_yh2` in `src/event.rs`) — note the concatenation
+order, `entry_body` first: an earlier version of this tool had it reversed,
+which compiled and ran fine but made every single entry report `mismatch`
+indistinguishably from either a broken chain or a firmware difference. If you
+still see `mismatch` on entries you know are healthy and contiguous, that's
+more likely a real signal now than a construction bug — though a firmware
+version this hasn't been checked against remains possible. `chain_status` is:
 
 - `ok` — links to the preceding entry
 - `unverified` — no anchor available (first collection, a gap in the cursor, or
   the first entry after a device reset, whose seed digest this tool does not know)
 - `mismatch` — the digest does not follow from the previous one
 
-Treat `mismatch` as a signal to investigate, not as proof of tampering: the
-construction above is not confirmed against a Yubico test vector, so a firmware
-difference would look identical to a broken chain. If your devices report
-`mismatch` on healthy, contiguous runs, set `verify_chain = false` and rely on
-`log_digest` uniqueness instead. Note also that editing one entry only breaks
-that entry's own link, so a `mismatch` points at the entry that changed.
+Treat `mismatch` as a signal to investigate, not as proof of tampering on its
+own — cross-check against `log_digest` uniqueness and the surrounding
+`sequence`/`tick` values before concluding an entry was altered. Editing one
+entry only breaks that entry's own link, so a `mismatch` points at the entry
+that changed; if you need to fall back to dedup-only integrity, set
+`verify_chain = false` and rely on `log_digest` uniqueness instead.
+
+## Running as a systemd service
+
+`systemd/` has a unit and an environment-file template for running `run`
+continuously. Adjust paths/user as needed:
+
+```
+useradd --system --home-dir /var/lib/yubihsm-auditor --create-home yubihsm-auditor
+
+install -m 755 target/release/yubihsm-auditor /usr/local/bin/yubihsm-auditor
+
+mkdir -p /etc/yubihsm-auditor /var/log/yubihsm
+./target/release/yubihsm-auditor init-config > /etc/yubihsm-auditor/yubihsm-auditor.toml
+# edit /etc/yubihsm-auditor/yubihsm-auditor.toml: devices, output (state_dir =
+# "/var/lib/yubihsm-auditor/state" and, for the file output,
+# path = "/var/log/yubihsm/audit.jsonl")
+
+cp systemd/yubihsm-auditor.env.example /etc/yubihsm-auditor/yubihsm-auditor.env
+# edit it with real device passwords / tokens
+
+chown -R yubihsm-auditor:yubihsm-auditor /etc/yubihsm-auditor /var/log/yubihsm
+chmod 600 /etc/yubihsm-auditor/yubihsm-auditor.env /etc/yubihsm-auditor/yubihsm-auditor.toml
+
+cp systemd/yubihsm-auditor.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now yubihsm-auditor
+journalctl -u yubihsm-auditor -f
+```
+
+The unit runs as the dedicated `yubihsm-auditor` user with a sandboxed
+`ProtectSystem=strict` profile that only grants write access to
+`/var/lib/yubihsm-auditor` (state) and `/var/log/yubihsm` (the `file`
+output's log directory) — widen `ReadWritePaths=` in the unit if you point
+`state_dir` or the `file` output's `path` somewhere else. Diagnostics go to
+stderr, which systemd captures to the journal, so `journalctl -u
+yubihsm-auditor` is where poll failures and delivery retries show up — the
+event stream itself goes only to the configured `output`, never the journal.
+
+Validate the destination before pointing it at real devices:
+
+```
+sudo -u yubihsm-auditor /usr/local/bin/yubihsm-auditor \
+  --config /etc/yubihsm-auditor/yubihsm-auditor.toml check
+sudo -u yubihsm-auditor /usr/local/bin/yubihsm-auditor \
+  --config /etc/yubihsm-auditor/yubihsm-auditor.toml sample-events
+```
 
 ## Getting events to your SIEM
 
 ### Wazuh
 
-Use the `syslog` output pointed at the Wazuh manager, which needs a `<remote>`
-syslog listener — see `wazuh/manager-remote.conf.example` for the `ossec.conf`
-snippet. Install `wazuh/decoders/local_decoder.xml` and
-`wazuh/rules/local_rules.xml` on the manager (`/var/ossec/etc/decoders/` and
-`/var/ossec/etc/rules/`) and restart it; the decoder recognizes the
-`yubihsm-auditor` APP-NAME and hands the JSON payload to Wazuh's JSON decoder,
-and the rules cover audit gaps, hash-chain mismatches, key management
-operations, failed commands, and a full log buffer. Treat both as a starting
-point — check them against your Wazuh version and existing rule IDs before
-relying on them.
+Two paths, depending on whether `wazuh-agent` already runs on the same host as
+the collector.
+
+**Agent on the same host (recommended when available)**: use the `file`
+output and let the agent tail it — no listener to open, no TLS, no PRI/CEF
+parsing, and delivery rides the agent's existing encrypted channel to the
+manager. See `wazuh/agent-localfile.conf.example` for the agent's
+`ossec.conf` `<localfile>` snippet (`log_format = "json"`, no custom decoder
+needed — Wazuh parses JSON localfiles natively) and
+`wazuh/rules/local_rules-agent.xml` for the manager-side rules, which use the
+same bare field names as the syslog path (`<field name="event_type">`, no
+prefix) — the `data.*` nesting you'll see in `archives.json`/`alerts.json` is
+only how Wazuh serializes the output, not how a rule's `<field name="...">`
+addresses a decoded key; confirm with `wazuh-logtest` if you're unsure, its
+Phase 2 output prints the bare names a rule should match against. See
+"Running as a systemd service" below for getting the binary running
+continuously in the first place.
+
+**No local agent** (the collector runs somewhere the manager can reach over
+the network, but that host doesn't run an agent): use the `syslog` output
+pointed at the Wazuh manager, which needs a `<remote>` syslog listener — see
+`wazuh/manager-remote.conf.example` for that `ossec.conf` snippet. Install
+`wazuh/decoders/local_decoder.xml` and `wazuh/rules/local_rules.xml` on the
+manager (`/var/ossec/etc/decoders/` and `/var/ossec/etc/rules/`); the decoder
+recognizes the `yubihsm-auditor` APP-NAME and hands the JSON payload to
+Wazuh's JSON decoder, and the rules use the unprefixed field names that
+produces.
+
+Install only the rule set matching the path you use — the field prefixes
+differ between them, and both are a starting point to check against your
+Wazuh version and existing rule IDs, not a drop-in guarantee.
 
 ### Elastic / OpenSearch
 

@@ -285,6 +285,24 @@ pub fn poll_device(
         })
         .collect();
 
+    if tracing::enabled!(tracing::Level::TRACE) {
+        for entry in &raw_entries {
+            tracing::trace!(
+                device = %device.name,
+                item = entry.item,
+                cmd = entry.cmd.to_u8(),
+                length = entry.length,
+                session_key = entry.session_key,
+                target_key = entry.target_key,
+                second_key = entry.second_key,
+                result = entry.result.to_u8(),
+                tick = entry.tick,
+                digest = %event::hex(&entry.digest),
+                "raw log entry"
+            );
+        }
+    }
+
     // Enrichment issues its own audited commands, so only pay for it when
     // there is something new to describe.
     let catalog = if config.enrich_objects && !select_new(&raw_entries, &state).is_empty() {

@@ -1,0 +1,43 @@
+[Unit]
+Description=YubiHSM 2 audit log collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yubihsm-auditor
+Group=yubihsm-auditor
+WorkingDirectory=/var/lib/yubihsm-auditor
+ExecStart=/usr/local/bin/yubihsm-auditor run --config /etc/yubihsm-auditor/yubihsm-auditor.toml
+# Device passwords / HEC tokens as YHA_*_PASSWORD etc, one per line, mode 600.
+# Referenced by the corresponding *_env keys in yubihsm-auditor.toml.
+EnvironmentFile=-/etc/yubihsm-auditor/yubihsm-auditor.env
+Restart=on-failure
+RestartSec=5
+
+# Sandboxing. yubihsm-auditor only needs to reach the connector(s) over the
+# network and read/write its own state dir, config, and (with the `file`
+# output) log directory.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/yubihsm-auditor /var/log/yubihsm
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictNamespaces=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

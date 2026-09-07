@@ -1,0 +1,37 @@
+<!--
+  Snippet for the Wazuh AGENT's /var/ossec/etc/ossec.conf, for when
+  yubihsm-auditor runs on the same host as the agent (the common case: no
+  syslog listener to open on the manager, no network hop, no TLS to set up —
+  the agent ships the events over its existing encrypted channel).
+
+  Pairs with yubihsm-auditor's `file` output:
+    [output]
+    type = "file"
+    path = "/var/log/yubihsm/audit.jsonl"
+    rotate_bytes = 134217728
+    rotate_keep = 5
+
+  Merge the <localfile> block into the agent's existing <ossec_config>, then
+  restart the agent (systemctl restart wazuh-agent). Wazuh's JSON log format
+  parses each line natively - no custom decoder needed, unlike the syslog
+  path (decoders/local_decoder.xml). Rule field matching uses the bare key
+  names (e.g. <field name="event_type">), same as the syslog path - see
+  rules/local_rules-agent.xml. (archives.json/alerts.json nest the decoded
+  fields under a `data` object for display, but that's just output
+  serialization; <field name="..."> in a rule addresses them by their bare
+  name regardless - confirmed with `wazuh-logtest`, whose Phase 2 output
+  prints bare names like `collector: '...'`.) Install one rule set or the
+  other, not both, per event stream - rules/local_rules-agent.xml for this
+  path, rules/local_rules.xml for the syslog-to-manager path.
+
+  Wazuh only tails the active file, so rotated files
+  (audit.jsonl.1, .2, ...) are never re-read - matching yubihsm-auditor's own
+  delivery guarantee that nothing is lost on a restart (see the project
+  README's "Delivery guarantees" section).
+-->
+<ossec_config>
+  <localfile>
+    <log_format>json</log_format>
+    <location>/var/log/yubihsm/audit.jsonl</location>
+  </localfile>
+</ossec_config>
