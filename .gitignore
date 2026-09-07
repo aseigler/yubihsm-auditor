@@ -1,0 +1,6 @@
+/target
+/state
+/smoke.toml
+*.jsonl
+*.jsonl.[0-9]
+yubihsm-auditor.toml

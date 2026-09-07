@@ -1,0 +1,22 @@
+<!--
+  Decoder for yubihsm-auditor's syslog output.
+
+  Install on the Wazuh manager as
+  /var/ossec/etc/decoders/local_decoder.xml (or merge into your existing
+  file), then restart the manager. Pairs with rules/local_rules.xml.
+
+  Each message is one RFC 5424 line:
+    <PRI>1 TIMESTAMP HOSTNAME APP-NAME PROCID MSGID - JSON
+  APP-NAME is "yubihsm-auditor" (configurable via output.app_name),
+  MSGID is the event_type (command/boot/device_status/unlogged_events),
+  and everything after the STRUCTURED-DATA "-" is the event as JSON.
+-->
+<decoder name="yubihsm-auditor">
+  <program_name>^yubihsm-auditor$</program_name>
+</decoder>
+
+<decoder name="yubihsm-auditor-json">
+  <parent>yubihsm-auditor</parent>
+  <prematch offset="after_parent">^\S+ - </prematch>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>

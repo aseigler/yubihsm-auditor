@@ -1,0 +1,139 @@
+{
+  "description": "Parse yubihsm-auditor JSON events into @timestamp and light ECS fields. Install with: PUT _ingest/pipeline/yubihsm-audit",
+  "processors": [
+    {
+      "json": {
+        "description": "Filebeat's ndjson parser (see filebeat.yml.example) already puts the event fields at the top level, so this is a no-op there. If instead `message` holds the raw JSON string - e.g. a Logstash pipeline that stripped the RFC 5424 header off the syslog output and forwarded just the JSON body as `message` - this pulls it back out.",
+        "field": "message",
+        "target_field": "_yha_parsed",
+        "ignore_failure": true
+      }
+    },
+    {
+      "script": {
+        "description": "Merge the fields parsed above into ctx if the json processor above found something; a direct JSON/Filebeat input already has them at the top level and _yha_parsed is absent.",
+        "lang": "painless",
+        "if": "ctx._yha_parsed != null",
+        "source": "for (entry in ((Map) ctx.remove('_yha_parsed')).entrySet()) { ctx[entry.getKey()] = entry.getValue(); }"
+      }
+    },
+    {
+      "date": {
+        "description": "time_iso is RFC 3339 with the collector's estimated operation time; use it for @timestamp instead of ingest time.",
+        "field": "time_iso",
+        "target_field": "@timestamp",
+        "formats": ["ISO8601"],
+        "if": "ctx.time_iso != null"
+      }
+    },
+    {
+      "set": {
+        "field": "event.dataset",
+        "value": "yubihsm.audit"
+      }
+    },
+    {
+      "set": {
+        "field": "event.module",
+        "value": "yubihsm-auditor"
+      }
+    },
+    {
+      "set": {
+        "field": "event.kind",
+        "value": "event"
+      }
+    },
+    {
+      "set": {
+        "field": "event.action",
+        "value": "{{{event_type}}}",
+        "if": "ctx.event_type != null"
+      }
+    },
+    {
+      "rename": {
+        "field": "result",
+        "target_field": "event.outcome",
+        "ignore_missing": true
+      }
+    },
+    {
+      "set": {
+        "field": "event.category",
+        "value": ["authentication"],
+        "if": "ctx.event_type == 'command' || ctx.event_type == 'boot'"
+      }
+    },
+    {
+      "set": {
+        "field": "event.category",
+        "value": ["configuration"],
+        "if": "ctx.event_type == 'unlogged_events'"
+      }
+    },
+    {
+      "set": {
+        "field": "event.severity",
+        "value": 9,
+        "if": "ctx.event_type == 'unlogged_events' || ctx.chain_status == 'mismatch'"
+      }
+    },
+    {
+      "set": {
+        "field": "event.severity",
+        "value": 6,
+        "if": "(ctx.event.severity == null) && ctx.result == 'error'"
+      }
+    },
+    {
+      "set": {
+        "field": "event.severity",
+        "value": 3,
+        "if": "ctx.event.severity == null"
+      }
+    },
+    {
+      "rename": {
+        "field": "device_serial",
+        "target_field": "observer.serial_number",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "device_version",
+        "target_field": "observer.version",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "device_name",
+        "target_field": "observer.name",
+        "ignore_missing": true
+      }
+    },
+    {
+      "remove": {
+        "field": ["message"],
+        "ignore_missing": true,
+        "if": "ctx.event_type != null"
+      }
+    }
+  ],
+  "on_failure": [
+    {
+      "set": {
+        "field": "error.message",
+        "value": "{{{ _ingest.on_failure_message }}}"
+      }
+    },
+    {
+      "append": {
+        "field": "tags",
+        "value": "yubihsm_audit_pipeline_failure"
+      }
+    }
+  ]
+}

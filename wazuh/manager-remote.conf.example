@@ -1,0 +1,22 @@
+<!--
+  Snippet for the Wazuh MANAGER's /var/ossec/etc/ossec.conf: opens a syslog
+  listener for yubihsm-auditor's `syslog` output. Merge the <remote> block
+  into the manager's existing <ossec_config>, then restart the manager
+  (systemctl restart wazuh-manager).
+
+  Point yubihsm-auditor's config at this manager:
+    [output]
+    type = "syslog"
+    protocol = "tcp"
+    host = "<this manager's address>"
+    port = 514
+-->
+<ossec_config>
+  <remote>
+    <connection>syslog</connection>
+    <port>514</port>
+    <protocol>tcp</protocol>
+    <!-- Restrict to the collector's address(es). -->
+    <allowed-ips>203.0.113.10/32</allowed-ips>
+  </remote>
+</ossec_config>

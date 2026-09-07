@@ -1,0 +1,94 @@
+{
+  "template": {
+    "settings": {
+      "index.default_pipeline": "yubihsm-audit"
+    },
+    "mappings": {
+      "_meta": {
+        "description": "Field mappings for yubihsm-auditor events. See the 'Elastic/OpenSearch' section of the project README for installation steps."
+      },
+      "dynamic_templates": [
+        {
+          "device_tags_as_keyword": {
+            "match_mapping_type": "string",
+            "unmatch": [
+              "time_iso",
+              "observed_at",
+              "message",
+              "error.message"
+            ],
+            "mapping": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      ],
+      "properties": {
+        "time": { "type": "double" },
+        "time_iso": { "type": "date" },
+        "time_source": { "type": "keyword" },
+        "time_uncertainty_secs": { "type": "float" },
+        "event_type": { "type": "keyword" },
+        "device_name": { "type": "keyword" },
+        "device_serial": { "type": "keyword" },
+        "device_version": { "type": "keyword" },
+        "connector_url": { "type": "keyword" },
+        "device_info_source": { "type": "keyword" },
+        "sequence": { "type": "long" },
+        "boot_session": { "type": "long" },
+        "log_item": { "type": "integer" },
+        "tick": { "type": "long" },
+        "command": { "type": "keyword" },
+        "command_code": { "type": "integer" },
+        "command_category": { "type": "keyword" },
+        "command_length": { "type": "integer" },
+        "key_usage": { "type": "boolean" },
+        "key_management": { "type": "boolean" },
+        "result": { "type": "keyword" },
+        "result_name": { "type": "keyword" },
+        "result_code": { "type": "integer" },
+        "session_key_id": { "type": "integer" },
+        "session_key_id_hex": { "type": "keyword" },
+        "session_key_label": { "type": "keyword" },
+        "target_key_id": { "type": "integer" },
+        "target_key_id_hex": { "type": "keyword" },
+        "target_key_label": { "type": "keyword" },
+        "target_key_type": { "type": "keyword" },
+        "second_key_id": { "type": "integer" },
+        "second_key_id_hex": { "type": "keyword" },
+        "second_key_label": { "type": "keyword" },
+        "log_digest": { "type": "keyword" },
+        "chain_status": { "type": "keyword" },
+        "log_store_used": { "type": "integer" },
+        "log_store_capacity": { "type": "integer" },
+        "log_store_percent_used": { "type": "integer" },
+        "unlogged_boot_events": { "type": "integer" },
+        "unlogged_auth_events": { "type": "integer" },
+        "entries_collected": { "type": "integer" },
+        "poll_skipped": { "type": "boolean" },
+        "observed_at": { "type": "date" },
+        "collector": { "type": "keyword" },
+        "collector_version": { "type": "keyword" },
+        "event": {
+          "properties": {
+            "dataset": { "type": "keyword" },
+            "module": { "type": "keyword" },
+            "kind": { "type": "keyword" },
+            "action": { "type": "keyword" },
+            "outcome": { "type": "keyword" },
+            "category": { "type": "keyword" },
+            "severity": { "type": "long" }
+          }
+        },
+        "observer": {
+          "properties": {
+            "name": { "type": "keyword" },
+            "serial_number": { "type": "keyword" },
+            "version": { "type": "keyword" }
+          }
+        }
+      }
+    }
+  }
+}

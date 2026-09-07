@@ -1,0 +1,69 @@
+<!--
+  Rules for yubihsm-auditor events, decoded by decoders/local_decoder.xml.
+
+  Install on the Wazuh manager as
+  /var/ossec/etc/rules/local_rules.xml (or merge into your existing file),
+  then restart the manager. Group IDs below (1,000,000+) are in Wazuh's
+  custom-rule range; renumber if they collide with rules you already have.
+-->
+<group name="yubihsm,hsm,">
+
+  <rule id="100000" level="3">
+    <decoded_as>yubihsm-auditor-json</decoded_as>
+    <description>YubiHSM audit event: $(device_name) $(event_type)</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100001" level="0">
+    <if_sid>100000</if_sid>
+    <field name="event_type">^device_status$</field>
+    <description>YubiHSM $(device_name): heartbeat (log $(log_store_percent_used)% full)</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100002" level="10">
+    <if_sid>100000</if_sid>
+    <field name="event_type">^unlogged_events$</field>
+    <description>YubiHSM $(device_name): audit gap - device recorded events it could not log</description>
+    <group>audit_gap,</group>
+  </rule>
+
+  <rule id="100003" level="10">
+    <if_sid>100000</if_sid>
+    <field name="chain_status">^mismatch$</field>
+    <description>YubiHSM $(device_name): audit log hash chain mismatch on entry $(log_item)</description>
+    <group>audit_gap,</group>
+  </rule>
+
+  <rule id="100004" level="7">
+    <if_sid>100000</if_sid>
+    <field name="event_type">^command$</field>
+    <field name="key_management">^true$</field>
+    <description>YubiHSM $(device_name): key management operation $(command) by 0x$(session_key_id_hex) on 0x$(target_key_id_hex)</description>
+    <group>key_management,</group>
+  </rule>
+
+  <rule id="100005" level="5">
+    <if_sid>100000</if_sid>
+    <field name="event_type">^command$</field>
+    <field name="result">^error$</field>
+    <description>YubiHSM $(device_name): $(command) failed ($(result_name)) for 0x$(session_key_id_hex)</description>
+  </rule>
+
+  <rule id="100006" level="8">
+    <if_sid>100005</if_sid>
+    <field name="result_name">^device_insufficient_permissions$</field>
+    <description>YubiHSM $(device_name): permission denied on $(command) - possible capability probing by 0x$(session_key_id_hex)</description>
+    <group>authentication_failures,</group>
+    <frequency>5</frequency>
+    <timeframe>300</timeframe>
+    <same_field>session_key_id</same_field>
+  </rule>
+
+  <rule id="100007" level="12">
+    <if_sid>100000</if_sid>
+    <field name="log_store_percent_used">^(7[6-9]|[89][0-9]|100)$</field>
+    <description>YubiHSM $(device_name): audit log buffer over 75% full ($(log_store_percent_used)%) - collector may be falling behind</description>
+  </rule>
+
+</group>
