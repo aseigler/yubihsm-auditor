@@ -355,7 +355,7 @@ pub fn poll_device(
         tracing::error!(
             device = %device.name,
             mismatches = outcome.chain_mismatches,
-            "log hash chain did not verify; see README (\"Hash chain\") before treating as tampering"
+            "log hash chain did not verify; see docs/polling-behavior.md (\"Hash chain\") before treating as tampering"
         );
     }
 

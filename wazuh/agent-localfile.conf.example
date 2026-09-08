@@ -26,8 +26,8 @@
 
   Wazuh only tails the active file, so rotated files
   (audit.jsonl.1, .2, ...) are never re-read - matching yubihsm-auditor's own
-  delivery guarantee that nothing is lost on a restart (see the project
-  README's "Delivery guarantees" section).
+  delivery guarantee that nothing is lost on a restart (see
+  docs/event-schema.md, "Delivery guarantees").
 -->
 <ossec_config>
   <localfile>

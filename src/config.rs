@@ -97,7 +97,7 @@ pub struct Device {
     pub password: Option<String>,
 
     /// Ticks per second of the device's internal clock, used to estimate
-    /// wall-clock times for log entries. See README ("Timestamps").
+    /// wall-clock times for log entries. See docs/polling-behavior.md ("Timestamps").
     #[serde(default = "default_tick_hz")]
     pub tick_hz: f64,
 

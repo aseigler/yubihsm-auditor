@@ -5,7 +5,7 @@
     },
     "mappings": {
       "_meta": {
-        "description": "Field mappings for yubihsm-auditor events. See the 'Elastic/OpenSearch' section of the project README for installation steps."
+        "description": "Field mappings for yubihsm-auditor events. See docs/siem-integrations.md, 'Elastic / OpenSearch' for installation steps."
       },
       "dynamic_templates": [
         {

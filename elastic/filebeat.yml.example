@@ -17,9 +17,8 @@ filebeat.inputs:
           add_error_key: true
           overwrite_keys: true
 
-# Load the ingest pipeline and mappings once (see the project README's
-# "Elastic/OpenSearch" section), then point Filebeat at the index and
-# pipeline:
+# Load the ingest pipeline and mappings once (see docs/siem-integrations.md,
+# "Elastic / OpenSearch"), then point Filebeat at the index and pipeline:
 output.elasticsearch:
   hosts: ["https://elasticsearch.example.com:9200"]
   index: "yubihsm-audit-%{+yyyy.MM.dd}"

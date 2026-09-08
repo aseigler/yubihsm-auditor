@@ -18,7 +18,7 @@
 //! crate exports only as `pub(crate)`. The type is therefore unnameable here and
 //! we have to reach it through the public `From<Vec<u8>>`/`Into<Vec<u8>>` impls
 //! and type inference. That works, but it is plainly not a path the crate meant
-//! to offer; see README ("Self-generated log entries").
+//! to offer; see docs/polling-behavior.md ("Self-generated log entries").
 
 use crate::config::Device;
 use anyhow::{Context, Result, bail};
